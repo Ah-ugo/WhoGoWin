@@ -134,3 +134,16 @@ async def update_notification_status(
         return {"message": f"Notifications marked as {'read' if update_data.read else 'unread'}"}
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid notification IDs")
+
+
+@router.put("/mark-read")
+async def mark_notifications_read(
+    update_data: NotificationUpdateRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    notification_ids = [ObjectId(nid) for nid in update_data.notification_ids]
+    await notifications_collection.update_many(
+        {"_id": {"$in": notification_ids}, "user_id": str(current_user["_id"])},
+        {"$set": {"read": update_data.read}}
+    )
+    return {"message": f"Notifications marked as {'read' if update_data.read else 'unread'}"}
