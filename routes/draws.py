@@ -55,31 +55,56 @@ async def get_active_draws():
             continue
     return result
 
+# @router.get("/completed", response_model=List[DrawResponse])
+# async def get_completed_draws():
+#     """Get completed draws with results"""
+#     draws = await draws_collection.find(
+#         {"status": "completed"}
+#     ).sort("end_time", -1).limit(50).to_list(50)
+#
+#     result = []
+#     for draw in draws:
+#         ticket_count = await tickets_collection.count_documents({"draw_id": str(draw["_id"])})
+#
+#         result.append(DrawResponse(
+#             id=str(draw["_id"]),
+#             draw_type=draw["draw_type"],
+#             start_time=draw["start_time"],
+#             end_time=draw["end_time"],
+#             total_pot=draw.get("total_pot", 0.0),
+#             total_tickets=ticket_count,
+#             status=draw["status"],
+#             first_place_winner=draw.get("first_place_winner"),
+#             consolation_winners=draw.get("consolation_winners", []),
+#             platform_earnings=draw.get("platform_earnings", 0.0),
+#             created_at=draw["created_at"]
+#         ))
+#
+#     return result
+
+
 @router.get("/completed", response_model=List[DrawResponse])
 async def get_completed_draws():
     """Get completed draws with results"""
-    draws = await draws_collection.find(
-        {"status": "completed"}
-    ).sort("end_time", -1).limit(50).to_list(50)
-
+    draws = await draws_collection.find({"status": "completed"}).sort("end_time", -1).limit(50).to_list(50)
     result = []
     for draw in draws:
         ticket_count = await tickets_collection.count_documents({"draw_id": str(draw["_id"])})
-
-        result.append(DrawResponse(
-            id=str(draw["_id"]),
-            draw_type=draw["draw_type"],
-            start_time=draw["start_time"],
-            end_time=draw["end_time"],
-            total_pot=draw.get("total_pot", 0.0),
-            total_tickets=ticket_count,
-            status=draw["status"],
-            first_place_winner=draw.get("first_place_winner"),
-            consolation_winners=draw.get("consolation_winners", []),
-            platform_earnings=draw.get("platform_earnings", 0.0),
-            created_at=draw["created_at"]
-        ))
-
+        # Convert _id to id and create DrawResponse
+        draw_data = {
+            "id": str(draw["_id"]),  # Convert ObjectId to string
+            "draw_type": draw["draw_type"],
+            "start_time": draw["start_time"],
+            "end_time": draw["end_time"],
+            "total_pot": draw.get("total_pot", 0.0),
+            "total_tickets": ticket_count,
+            "status": draw["status"],
+            "first_place_winner": draw.get("first_place_winner"),
+            "consolation_winners": draw.get("consolation_winners", []),
+            "platform_earnings": draw.get("platform_earnings", 0.0),
+            "created_at": draw["created_at"]
+        }
+        result.append(DrawResponse(**draw_data))
     return result
 
 @router.get("/{draw_id}", response_model=DrawResponse)
