@@ -117,7 +117,60 @@ async def topup_wallet(
                 reference=payload["reference"]
             )
 
-@router.get("/verify-payment", response_model=dict)
+# @router.get("/verify-payment", response_model=dict)
+# async def verify_payment(reference: str):
+#     """Verify Paystack payment and credit wallet"""
+#     async with aiohttp.ClientSession() as session:
+#         headers = {
+#             "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
+#             "Content-Type": "application/json"
+#         }
+#         async with session.get(
+#             f"{PAYSTACK_API_URL}/transaction/verify/{reference}",
+#             headers=headers
+#         ) as response:
+#             if response.status != 200:
+#                 raise HTTPException(status_code=500, detail="Failed to verify payment")
+#             data = await response.json()
+#             if not data.get("status") or data["data"]["status"] != "success":
+#                 raise HTTPException(status_code=400, detail="Payment verification failed")
+#
+#             # Check if transaction already processed
+#             transaction = await transactions_collection.find_one({"paystack_reference": reference})
+#             if not transaction:
+#                 raise HTTPException(status_code=400, detail="Transaction not found")
+#             if transaction["status"] == "completed":
+#                 return {"message": "Payment already processed"}
+#
+#             # Credit wallet
+#             await wallet_service.credit_wallet(
+#                 transaction["user_id"],
+#                 transaction["amount"],
+#                 f"Wallet top-up via Paystack (Ref: {reference})"
+#             )
+#
+#             # Update transaction status
+#             await transactions_collection.update_one(
+#                 {"paystack_reference": reference},
+#                 {"$set": {"status": "completed", "updated_at": datetime.now(pytz.UTC)}}
+#             )
+#
+#             return {
+#                 "message": "Payment verified and wallet credited",
+#                 "amount": transaction["amount"],
+#                 "new_balance": await wallet_service.get_balance(transaction["user_id"])
+#             }
+
+
+from fastapi.responses import HTMLResponse
+# from fastapi import APIRouter, HTTPException, Request
+# import aiohttp
+# from datetime import datetime
+# import pytz
+#
+# router = APIRouter()
+
+@router.get("/verify-payment", response_class=HTMLResponse)
 async def verify_payment(reference: str):
     """Verify Paystack payment and credit wallet"""
     async with aiohttp.ClientSession() as session:
@@ -140,7 +193,81 @@ async def verify_payment(reference: str):
             if not transaction:
                 raise HTTPException(status_code=400, detail="Transaction not found")
             if transaction["status"] == "completed":
-                return {"message": "Payment already processed"}
+                html_content = f"""
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Payment Already Processed</title>
+                    <style>
+                        body {{
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                            background-color: #f2f2f7;
+                            margin: 0;
+                            padding: 0;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            min-height: 100vh;
+                            color: #1d1d1f;
+                        }}
+                        .container {{
+                            background-color: #ffffff;
+                            border-radius: 16px;
+                            padding: 24px;
+                            max-width: 400px;
+                            width: 90%;
+                            text-align: center;
+                            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                        }}
+                        .info-icon {{
+                            font-size: 48px;
+                            color: #007aff;
+                            margin-bottom: 16px;
+                        }}
+                        .title {{
+                            font-size: 24px;
+                            font-weight: bold;
+                            margin-bottom: 12px;
+                        }}
+                        .message {{
+                            font-size: 16px;
+                            color: #86868b;
+                            margin-bottom: 20px;
+                        }}
+                        .return-button {{
+                            background-color: #007aff;
+                            color: #ffffff;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            text-decoration: none;
+                            font-weight: 600;
+                            font-size: 16px;
+                            display: inline-block;
+                            transition: background-color 0.2s;
+                        }}
+                        .return-button:hover {{
+                            background-color: #0051cb;
+                        }}
+                        @media (max-width: 600px) {{
+                            .container {{
+                                margin: 20px;
+                            }}
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="info-icon">ℹ️</div>
+                        <h1 class="title">Payment Already Processed</h1>
+                        <p class="message">This payment has already been processed and credited to your wallet.</p>
+                        <a href="whogowin://" class="return-button">Return to App</a>
+                    </div>
+                </body>
+                </html>
+                """
+                return HTMLResponse(content=html_content, status_code=200)
 
             # Credit wallet
             await wallet_service.credit_wallet(
@@ -155,11 +282,110 @@ async def verify_payment(reference: str):
                 {"$set": {"status": "completed", "updated_at": datetime.now(pytz.UTC)}}
             )
 
-            return {
+            # Prepare response data
+            response_data = {
                 "message": "Payment verified and wallet credited",
                 "amount": transaction["amount"],
                 "new_balance": await wallet_service.get_balance(transaction["user_id"])
             }
+
+            # Return HTML with dynamic data
+            html_content = f"""
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Payment Successful</title>
+                <style>
+                    body {{
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                        background-color: #f2f2f7;
+                        margin: 0;
+                        padding: 0;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        color: #1d1d1f;
+                    }}
+                    .container {{
+                        background-color: #ffffff;
+                        border-radius: 16px;
+                        padding: 24px;
+                        max-width: 400px;
+                        width: 90%;
+                        text-align: center;
+                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                    }}
+                    .success-icon {{
+                        font-size: 48px;
+                        color: #34c759;
+                        margin-bottom: 16px;
+                    }}
+                    .title {{
+                        font-size: 24px;
+                        font-weight: bold;
+                        margin-bottom: 12px;
+                    }}
+                    .message {{
+                        font-size: 16px;
+                        color: #86868b;
+                        margin-bottom: 20px;
+                    }}
+                    .details {{
+                        background-color: #f2f2f7;
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin-bottom: 20px;
+                    }}
+                    .details p {{
+                        margin: 8px 0;
+                        font-size: 16px;
+                    }}
+                    .details .amount {{
+                        font-weight: bold;
+                        color: #34c759;
+                    }}
+                    .details .balance {{
+                        font-weight: bold;
+                    }}
+                    .return-button {{
+                        background-color: #007aff;
+                        color: #ffffff;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        text-decoration: none;
+                        font-weight: 600;
+                        font-size: 16px;
+                        display: inline-block;
+                        transition: background-color 0.2s;
+                    }}
+                    .return-button:hover {{
+                        background-color: #0051cb;
+                    }}
+                    @media (max-width: 600px) {{
+                        .container {{
+                            margin: 20px;
+                        }}
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="success-icon">✔️</div>
+                    <h1 class="title">Payment Successful</h1>
+                    <p class="message">{response_data["message"]}</p>
+                    <div class="details">
+                        <p>Amount Credited: <span class="amount">₦{response_data["amount"]:,}</span></p>
+                        <p>New Balance: <span class="balance">₦{response_data["new_balance"]:,}</span></p>
+                    </div>
+                    <a href="whogowin://" class="return-button">Return to App</a>
+                </div>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=html_content, status_code=200)
 
 @router.post("/webhook")
 async def paystack_webhook(request: fastapi.Request):
