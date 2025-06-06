@@ -85,7 +85,7 @@ async def topup_wallet(
             "amount": int(topup_data.amount * 100),  # Paystack expects amount in kobo
             "email": current_user["email"],
             "reference": f"topup_{str(current_user['_id'])}_{int(datetime.now(pytz.UTC).timestamp())}",
-            "callback_url": "http://127.0.0.1:8000/api/v1/wallet/verify-payment",  # Update with your frontend redirect URL
+            "callback_url": "https://whogowin.onrender.com/api/v1/wallet/verify-payment",  # Update with your frontend redirect URL
             "currency": "NGN"
         }
         async with session.post(
@@ -118,7 +118,7 @@ async def topup_wallet(
             )
 
 @router.get("/verify-payment", response_model=dict)
-async def verify_payment(reference: str, current_user: dict = Depends(get_current_user)):
+async def verify_payment(reference: str):
     """Verify Paystack payment and credit wallet"""
     async with aiohttp.ClientSession() as session:
         headers = {
