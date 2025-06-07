@@ -17,6 +17,44 @@ class DrawService:
     def __init__(self):
         self.wallet_service = WalletService()
         self.notification_service = NotificationService()
+        self.base_ticket_price = 100.0  # Base price for one ticket in ₦
+
+    async def purchase_ticket(self, user_id: str, draw_id: str, ticket_price: float) -> List[str]:
+        """Purchase a ticket and create multiple entries based on ticket price"""
+        if ticket_price < self.base_ticket_price:
+            raise ValueError(f"Ticket price must be at least ₦{self.base_ticket_price}")
+
+        # Calculate number of virtual tickets
+        ticket_count = int(ticket_price / self.base_ticket_price)
+        current_time = datetime.utcnow()
+
+        # Create ticket entries
+        ticket_ids = []
+        for _ in range(ticket_count):
+            ticket = {
+                "user_id": user_id,
+                "draw_id": draw_id,
+                "ticket_price": self.base_ticket_price,  # Store base price per virtual ticket
+                "status": "active",
+                "created_at": current_time
+            }
+            result = await tickets_collection.insert_one(ticket)
+            ticket_ids.append(str(result.inserted_id))
+
+        # Update draw's total pot
+        await draws_collection.update_one(
+            {"_id": ObjectId(draw_id)},
+            {"$inc": {"total_pot": ticket_price}}
+        )
+
+        # Debit user's wallet
+        await self.wallet_service.debit_wallet(
+            user_id,
+            ticket_price,
+            f"Ticket purchase for draw {draw_id}"
+        )
+
+        return ticket_ids
 
     async def start_draw_scheduler(self):
         """Start the background task to check for completed draws"""
@@ -103,15 +141,20 @@ class DrawService:
         tickets = await tickets_collection.find({"draw_id": draw_id}).to_list(1000)
         total_refunded = 0.0
 
+        # Group tickets by user to calculate total refund per user
+        user_tickets = {}
         for ticket in tickets:
-            ticket_price = ticket.get("ticket_price", 0.0)
             user_id = ticket["user_id"]
+            ticket_price = ticket.get("ticket_price", self.base_ticket_price)
+            user_tickets[user_id] = user_tickets.get(user_id, 0.0) + ticket_price
+            total_refunded += ticket_price
+
+        for user_id, refund_amount in user_tickets.items():
             await self.wallet_service.credit_wallet(
                 user_id,
-                ticket_price,
+                refund_amount,
                 f"Refund for cancelled draw {draw_id}"
             )
-            total_refunded += ticket_price
 
         await tickets_collection.update_many(
             {"draw_id": draw_id},
@@ -130,13 +173,13 @@ class DrawService:
             }
         )
 
-        for ticket in tickets:
-            user = await users_collection.find_one({"_id": ObjectId(ticket["user_id"])})
+        for user_id in user_tickets:
+            user = await users_collection.find_one({"_id": ObjectId(user_id)})
             if user.get("push_token"):
                 await self.notification_service.send_push_notification(
                     user["push_token"],
                     "Draw Cancelled",
-                    f"The {draw['draw_type']} draw has been cancelled. Your ticket price of ₦{ticket.get('ticket_price', 0.0):,.0f} has been refunded."
+                    f"The {draw['draw_type']} draw has been cancelled. Your ticket price of ₦{user_tickets[user_id]:,.0f} has been refunded."
                 )
 
     async def select_winners(self, tickets: List[Dict], first_place_prize: float, consolation_pool: float) -> Dict:
@@ -144,6 +187,7 @@ class DrawService:
         if not tickets:
             return {"first_place": None, "consolation": []}
 
+        # Select first place winner
         first_place_ticket = random.choice(tickets)
         first_place_user = await users_collection.find_one(
             {"_id": ObjectId(first_place_ticket["user_id"])}
@@ -155,7 +199,8 @@ class DrawService:
             "prize_amount": first_place_prize
         }
 
-        remaining_tickets = [t for t in tickets if t["_id"] != first_place_ticket["_id"]]
+        # Filter out tickets from the first-place winner to prevent them from winning consolation prizes
+        remaining_tickets = [t for t in tickets if t["user_id"] != first_place_ticket["user_id"]]
         consolation_winners = []
 
         if remaining_tickets and consolation_pool > 0:
@@ -188,6 +233,7 @@ class DrawService:
                 f"First place prize - Draw {draw_id}"
             )
 
+            # Update one of the winner's tickets
             await tickets_collection.update_one(
                 {"user_id": winner["user_id"], "draw_id": draw_id},
                 {
@@ -206,6 +252,7 @@ class DrawService:
                 f"Consolation prize - Draw {draw_id}"
             )
 
+            # Update one of the winner's tickets
             await tickets_collection.update_one(
                 {"user_id": winner["user_id"], "draw_id": draw_id},
                 {
@@ -217,6 +264,7 @@ class DrawService:
                 }
             )
 
+        # Update all non-winning tickets
         await tickets_collection.update_many(
             {
                 "draw_id": draw_id,
