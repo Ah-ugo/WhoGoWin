@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import secrets
 import string
 import os
-
+from fastapi.responses import HTMLResponse
 from models.user import UserCreate, UserLogin, TokenResponse, UserResponse, Role, ForgotPasswordRequest, ResetPasswordRequest
 from database import users_collection
 from bson import ObjectId
@@ -233,3 +233,114 @@ async def reset_password(request: ResetPasswordRequest):
     )
 
     return {"message": "Password reset successfully"}
+
+
+@router.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page():
+    """
+    Serve the HTML interface for resetting the password.
+    """
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Reset Password - WhoGoWin</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            .error { color: #ef4444; }
+            .success { color: #10b981; }
+            .hidden { display: none; }
+        </style>
+    </head>
+    <body class="bg-gray-900 min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
+        <div class="w-full max-w-md bg-gray-800 p-6 sm:p-8 rounded-lg shadow-lg">
+            <h2 class="text-2xl sm:text-3xl font-bold text-white text-center mb-6">Reset Your Password</h2>
+            <div id="message" class="mb-4 text-center text-sm sm:text-base hidden"></div>
+            <form id="reset-password-form" class="space-y-6">
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-300">New Password</label>
+                    <input type="password" id="password" name="password" required
+                           class="mt-1 w-full px-3 py-2 bg-gray-700 text-white border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm sm:text-base"
+                           placeholder="Enter new password">
+                </div>
+                <div>
+                    <label for="confirm-password" class="block text-sm font-medium text-gray-300">Confirm Password</label>
+                    <input type="password" id="confirm-password" name="confirm-password" required
+                           class="mt-1 w-full px-3 py-2 bg-gray-700 text-white border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm sm:text-base"
+                           placeholder="Confirm new password">
+                </div>
+                <button type="submit"
+                        class="w-full bg-yellow-500 text-gray-900 font-semibold py-2 px-4 rounded-md hover:bg-yellow-400 transition duration-200 text-sm sm:text-base">
+                    Reset Password
+                </button>
+            </form>
+            <p class="mt-4 text-center text-sm text-gray-400">
+                After resetting, return to the WhoGoWin mobile app to log in.
+            </p>
+        </div>
+
+        <script>
+            document.getElementById('reset-password-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const password = document.getElementById('password').value;
+                const confirmPassword = document.getElementById('confirm-password').value;
+                const messageDiv = document.getElementById('message');
+
+                // Client-side validation
+                if (password !== confirmPassword) {
+                    messageDiv.className = 'error';
+                    messageDiv.textContent = 'Passwords do not match';
+                    messageDiv.classList.remove('hidden');
+                    return;
+                }
+
+                // Get token from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const token = urlParams.get('token');
+                if (!token) {
+                    messageDiv.className = 'error';
+                    messageDiv.textContent = 'Invalid or missing reset token';
+                    messageDiv.classList.remove('hidden');
+                    return;
+                }
+
+                // Disable button during request
+                const button = document.querySelector('button[type="submit"]');
+                button.disabled = true;
+                button.textContent = 'Resetting...';
+
+                try {
+                    const response = await fetch('https://whogowin.onrender.com/api/v1/auth/reset-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token, new_password: password })
+                    });
+
+                    const data = await response.json();
+                    if (response.ok) {
+                        messageDiv.className = 'success';
+                        messageDiv.textContent = 'Password reset successfully. Please return to the WhoGoWin mobile app to log in.';
+                        messageDiv.classList.remove('hidden');
+                        // No redirect since it's a mobile app
+                    } else {
+                        messageDiv.className = 'error';
+                        messageDiv.textContent = data.detail || 'Failed to reset password';
+                        messageDiv.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    messageDiv.className = 'error';
+                    messageDiv.textContent = 'An error occurred. Please try again.';
+                    messageDiv.classList.remove('hidden');
+                } finally {
+                    button.disabled = false;
+                    button.textContent = 'Reset Password';
+                }
+            });
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
