@@ -20,12 +20,19 @@ class Transaction(BaseModel):
     description: str
     status: TransactionStatus
     date: datetime
+    account_name: Optional[str] = None
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+
 
 class WalletTopup(BaseModel):
     amount: float
 
 class WalletWithdraw(BaseModel):
     amount: float
+    account_name: str
+    bank_name: str
+    account_number: str
 
 class WalletResponse(BaseModel):
     balance: float

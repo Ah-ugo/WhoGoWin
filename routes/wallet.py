@@ -437,7 +437,10 @@ async def withdraw_from_wallet(
         "description": "Withdrawal request",
         "status": "pending",
         "date": datetime.now(pytz.UTC),
-        "withdrawal_request": True
+        "withdrawal_request": True,
+        "account_name": withdraw_data.account_name,
+        "bank_name": withdraw_data.bank_name,
+        "account_number": withdraw_data.account_number
     }
     await transactions_collection.insert_one(transaction_doc)
 
@@ -447,6 +450,7 @@ async def withdraw_from_wallet(
         "status": "pending",
         "note": "Your withdrawal will be processed within 24 hours"
     }
+
 
 @router.get("/transactions", response_model=List[Transaction])
 async def get_transactions(current_user: dict = Depends(get_current_user)):
@@ -533,10 +537,14 @@ async def get_pending_withdrawals(
             amount=txn["amount"],
             description=txn["description"],
             status=txn["status"],
-            date=txn["date"]
+            date=txn["date"],
+            account_name=txn.get("account_name"),
+            bank_name=txn.get("bank_name"),
+            account_number=txn.get("account_number")
         )
         for txn in transactions
     ]
+
 
 @router.post("/withdrawals/{transaction_id}/action", response_model=dict)
 async def process_withdrawal(

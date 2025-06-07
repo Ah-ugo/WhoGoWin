@@ -125,17 +125,17 @@ class WalletService:
             }
         )
 
-        # Notify user
+        # Notify user with bank details
         if user.get("push_token"):
             await self.notification_service.send_push_notification(
                 user["push_token"],
                 "Withdrawal Approved",
-                f"Your withdrawal request of ₦{transaction['amount']:,.0f} has been approved."
+                f"Your withdrawal of ₦{transaction['amount']:,.0f} to {transaction.get('account_name')} ({transaction.get('bank_name')}, {transaction.get('account_number')}) has been approved."
             )
         await self.notification_service.save_notification(
             user_id=transaction["user_id"],
             title="Withdrawal Approved",
-            body=f"Your withdrawal request of ₦{transaction['amount']:,.0f} has been approved.",
+            body=f"Your withdrawal of ₦{transaction['amount']:,.0f} to {transaction.get('account_name')} ({transaction.get('bank_name')}, {transaction.get('account_number')}) has been approved.",
             notification_type="withdrawal_approved"
         )
 
