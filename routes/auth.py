@@ -185,7 +185,7 @@ async def forgot_password(request: ForgotPasswordRequest):
     )
 
     # Create reset link (replace with your frontend URL)
-    reset_link = f"https://whogowin.onrender.com/reset-password?token={reset_token}"
+    reset_link = f"https://whogowin.onrender.com/api/v1/auth/reset-password?token={reset_token}"
 
     # Send email with reset link
     subject = "Password Reset Request"
