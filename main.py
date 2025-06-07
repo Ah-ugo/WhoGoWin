@@ -447,7 +447,7 @@ async def root():
 
             <div class="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
                 <p class="text-gray-400 mb-4 md:mb-0">© 2025 WhoGoWin. All rights reserved.</p>
-                <p class="text-gray-400 text-sm">Licensed by the National Lottery Regulatory Commission</p>
+                <p class="text-gray-400 text-sm">Powered by Odin Games</p>
             </div>
         </div>
     </footer>
