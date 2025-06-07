@@ -7,9 +7,10 @@ import secrets
 import string
 import os
 
-from models.user import UserCreate, UserLogin, TokenResponse, UserResponse, Role
+from models.user import UserCreate, UserLogin, TokenResponse, UserResponse, Role, ForgotPasswordRequest, ResetPasswordRequest
 from database import users_collection
 from bson import ObjectId
+from services.email_service import send_email
 
 router = APIRouter()
 security = HTTPBearer()
@@ -18,6 +19,7 @@ security = HTTPBearer()
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30 days
+RESET_TOKEN_EXPIRE_MINUTES = 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -40,6 +42,10 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
 def generate_referral_code():
     """Generate a unique referral code"""
     return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+
+def generate_reset_token():
+    """Generate a secure random reset token"""
+    return ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     credentials_exception = HTTPException(
@@ -153,3 +159,77 @@ async def login(user_data: UserLogin):
     )
 
     return TokenResponse(access_token=access_token, user=user_response)
+
+
+@router.post("/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    # Find user by email
+    user = await users_collection.find_one({"email": request.email})
+    if not user:
+        # Return success even if user doesn't exist to prevent email enumeration
+        return {"message": "If an account exists, a reset link has been sent"}
+
+    # Generate reset token and expiration
+    reset_token = generate_reset_token()
+    reset_token_expires = datetime.utcnow() + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+
+    # Store reset token and expiration in user document
+    await users_collection.update_one(
+        {"_id": user["_id"]},
+        {
+            "$set": {
+                "reset_token": reset_token,
+                "reset_token_expires": reset_token_expires
+            }
+        }
+    )
+
+    # Create reset link (replace with your frontend URL)
+    reset_link = f"https://whogowin.onrender.com/reset-password?token={reset_token}"
+
+    # Send email with reset link
+    subject = "Password Reset Request"
+    body = f"""
+    <h2>Password Reset Request</h2>
+    <p>You requested to reset your password. Click the link below to set a new password:</p>
+    <p><a href="{reset_link}">Reset Password</a></p>
+    <p>This link will expire in {RESET_TOKEN_EXPIRE_MINUTES} minutes.</p>
+    <p>If you didn't request this, please ignore this email.</p>
+    """
+    await send_email(to_email=request.email, subject=subject, body=body)
+
+    return {"message": "If an account exists, a reset link has been sent"}
+
+@router.post("/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    # Find user by reset token
+    user = await users_collection.find_one({"reset_token": request.token})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+
+    # Check if token has expired
+    if user.get("reset_token_expires") < datetime.utcnow():
+        # Clear expired token
+        await users_collection.update_one(
+            {"_id": user["_id"]},
+            {"$unset": {"reset_token": "", "reset_token_expires": ""}}
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+
+    # Update password and clear reset token
+    hashed_password = get_password_hash(request.new_password)
+    await users_collection.update_one(
+        {"_id": user["_id"]},
+        {
+            "$set": {"password": hashed_password},
+            "$unset": {"reset_token": "", "reset_token_expires": ""}
+        }
+    )
+
+    return {"message": "Password reset successfully"}
