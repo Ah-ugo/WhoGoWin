@@ -41,6 +41,30 @@ async def register_push_token(
     )
     return {"message": "Push token registered successfully"}
 
+
+@router.delete("/deregister-token")
+async def deregister_push_token(current_user: dict = Depends(get_current_user)):
+    """Remove user's push notification token"""
+    try:
+        print(f"Deregistering push token for user {current_user['_id']}")
+        result = await users_collection.update_one(
+            {"_id": ObjectId(current_user["_id"])},
+            {
+                "$unset": {
+                    "push_token": "",
+                    "push_token_updated": ""
+                }
+            }
+        )
+        if result.modified_count == 0 and result.matched_count == 0:
+            print(f"Failed to deregister push token for user {current_user['_id']}: No user found")
+            raise HTTPException(status_code=404, detail="User not found")
+        print(f"Push token deregistered successfully for user {current_user['_id']}")
+        return {"message": "Push token deregistered successfully"}
+    except Exception as e:
+        print(f"Error deregistering push token for user {current_user['_id']}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to deregister push token: {str(e)}")
+
 @router.post("/send-test")
 async def send_test_notification(current_user: dict = Depends(get_current_user)):
     """Send a test notification to current user"""
