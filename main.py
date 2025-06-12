@@ -187,10 +187,12 @@ async def root():
             </div>
 
             <div class="space-y-4 md:space-y-0 md:space-x-6 md:flex md:justify-center md:items-center" data-aos="fade-up" data-aos-delay="600">
+            <a href="https://expo.dev/artifacts/eas/w4NbQTeuLKi6U31i7Xv2Bt.apk" target="_blank" class="no-underline">
                 <button class="gold-gradient hover-lift pulse-glow px-8 py-4 rounded-full text-black font-bold text-xl transition-all duration-300 w-full md:w-auto">
                     <i class="fas fa-download mr-2"></i>
                     Download App Now
                 </button>
+                </a>
                 <button class="border-2 border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black px-8 py-4 rounded-full font-bold text-xl transition-all duration-300 w-full md:w-auto">
                     <i class="fas fa-play mr-2"></i>
                     Watch Demo
@@ -384,10 +386,12 @@ async def root():
             <p class="text-xl md:text-2xl mb-8 max-w-3xl mx-auto text-gray-300">
                 Join thousands of Nigerians who are already winning with WhoGoWin. Your lucky numbers are waiting!
             </p>
+             <a href="https://expo.dev/artifacts/eas/w4NbQTeuLKi6U31i7Xv2Bt.apk" target="_blank" class="no-underline">
             <button class="gold-gradient hover-lift pulse-glow px-12 py-6 rounded-full text-black font-bold text-2xl transition-all duration-300">
                 <i class="fas fa-download mr-3"></i>
                 Download WhoGoWin Now
             </button>
+            </a>
             <p class="mt-4 text-sm text-gray-400">Available on Android and iOS • 100% Free to Download</p>
         </div>
     </section>
