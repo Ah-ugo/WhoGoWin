@@ -90,15 +90,20 @@ async def get_completed_draws():
     result = []
     for draw in draws:
         ticket_count = await tickets_collection.count_documents({"draw_id": str(draw["_id"])})
-        # Convert _id to id and create DrawResponse
+
+        # Convert MongoDB's number objects to plain integers for winning_numbers
+        winning_numbers = [num if isinstance(num, int) else num['$numberInt'] for num in
+                           draw.get("winning_numbers", [])]
+
         draw_data = {
-            "id": str(draw["_id"]),  # Convert ObjectId to string
+            "id": str(draw["_id"]),
             "draw_type": draw["draw_type"],
             "start_time": draw["start_time"],
             "end_time": draw["end_time"],
             "total_pot": draw.get("total_pot", 0.0),
             "total_tickets": ticket_count,
             "status": draw["status"],
+            "winning_numbers": winning_numbers,
             "first_place_winner": draw.get("first_place_winner"),
             "consolation_winners": draw.get("consolation_winners", []),
             "platform_earnings": draw.get("platform_earnings", 0.0),

@@ -84,6 +84,7 @@ class DrawCreate(BaseModel):
     draw_type: DrawType
     end_time: datetime
 
+
 class DrawResponse(BaseModel):
     id: str
     draw_type: str
@@ -92,8 +93,9 @@ class DrawResponse(BaseModel):
     total_pot: float
     total_tickets: int
     status: str
-    first_place_winner: Optional[Winner] = None  # Changed from Optional[str]
-    consolation_winners: List[Winner] = []      # Changed from List[str]
+    winning_numbers: List[int]
+    first_place_winner: Optional[Winner] = None
+    consolation_winners: List[Winner] = []
     platform_earnings: float
     created_at: datetime
 

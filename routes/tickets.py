@@ -13,12 +13,13 @@ router = APIRouter()
 wallet_service = WalletService()
 notification_service = NotificationService()
 
+
 @router.post("/buy", response_model=TicketResponse)
 async def buy_ticket(
         ticket_data: TicketCreate,
         current_user: dict = Depends(get_current_user)
 ):
-    """Buy a lottery ticket"""
+    """Buy a lottery ticket with selected numbers"""
     try:
         draw = await draws_collection.find_one({"_id": ObjectId(ticket_data.draw_id)})
         if not draw:
@@ -51,10 +52,12 @@ async def buy_ticket(
         "draw_id": ticket_data.draw_id,
         "draw_type": draw["draw_type"],
         "ticket_price": ticket_data.ticket_price,
+        "selected_numbers": ticket_data.selected_numbers,  # Store selected numbers
         "purchase_date": datetime.utcnow(),
         "status": "active",
         "is_winner": False,
-        "prize_amount": None
+        "prize_amount": None,
+        "match_count": None
     }
 
     result = await tickets_collection.insert_one(ticket_doc)
@@ -71,34 +74,43 @@ async def buy_ticket(
         draw_id=ticket_doc["draw_id"],
         draw_type=ticket_doc["draw_type"],
         ticket_price=ticket_doc["ticket_price"],
+        selected_numbers=ticket_doc["selected_numbers"],  # Include in response
         purchase_date=ticket_doc["purchase_date"],
         status=ticket_doc["status"],
         is_winner=ticket_doc["is_winner"],
-        prize_amount=ticket_doc["prize_amount"]
+        prize_amount=ticket_doc["prize_amount"],
+        match_count=ticket_doc["match_count"]
     )
+
 
 @router.get("/my-tickets", response_model=List[TicketResponse])
 async def get_my_tickets(current_user: dict = Depends(get_current_user)):
-    """Get current user's tickets"""
+    """Get current user's tickets with proper handling of selected_numbers"""
     tickets = await tickets_collection.find(
         {"user_id": str(current_user["_id"])}
     ).sort("purchase_date", -1).to_list(100)
 
     result = []
     for ticket in tickets:
+        # Ensure selected_numbers exists, provide empty list as default
+        selected_numbers = ticket.get("selected_numbers", [])
+
         result.append(TicketResponse(
             id=str(ticket["_id"]),
             user_id=ticket["user_id"],
             draw_id=ticket["draw_id"],
             draw_type=ticket["draw_type"],
             ticket_price=ticket["ticket_price"],
+            selected_numbers=selected_numbers,  # Now always provided
             purchase_date=ticket["purchase_date"],
             status=ticket["status"],
             is_winner=ticket.get("is_winner", False),
-            prize_amount=ticket.get("prize_amount")
+            prize_amount=ticket.get("prize_amount"),
+            match_count=ticket.get("match_count")
         ))
 
     return result
+
 
 @router.get("/{ticket_id}", response_model=TicketResponse)
 async def get_ticket(
