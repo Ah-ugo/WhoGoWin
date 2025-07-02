@@ -23,7 +23,7 @@ class TicketResponse(BaseModel):
     draw_id: str
     draw_type: str
     ticket_price: float
-    selected_numbers: List[int]
+    selected_numbers: List[int] = []
     match_count: Optional[int] = None
     purchase_date: datetime
     status: str
