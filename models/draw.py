@@ -93,7 +93,7 @@ class DrawResponse(BaseModel):
     total_pot: float
     total_tickets: int
     status: str
-    winning_numbers: List[int]
+    winning_numbers: List[int] = []
     first_place_winner: Optional[Winner] = None
     consolation_winners: List[Winner] = []
     platform_earnings: float

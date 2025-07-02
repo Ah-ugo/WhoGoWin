@@ -193,6 +193,7 @@ async def create_draw(
         "total_pot": 0.0,
         "total_tickets": 0,
         "status": "active",
+        "winning_numbers": [],  # Initialize empty winning numbers
         "first_place_winner": None,
         "consolation_winners": [],
         "platform_earnings": 0.0,
@@ -210,12 +211,12 @@ async def create_draw(
         total_pot=draw_doc["total_pot"],
         total_tickets=draw_doc["total_tickets"],
         status=draw_doc["status"],
+        winning_numbers=draw_doc["winning_numbers"],  # Now included
         first_place_winner=draw_doc["first_place_winner"],
         consolation_winners=draw_doc["consolation_winners"],
         platform_earnings=draw_doc["platform_earnings"],
         created_at=draw_doc["created_at"]
     )
-
 
 @router.put("/{draw_id}/update", response_model=DrawResponse)
 async def update_draw(
