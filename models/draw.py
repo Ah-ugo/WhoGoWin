@@ -60,7 +60,7 @@
 #     status: Optional[str] = None
 
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 from enum import Enum
@@ -77,8 +77,11 @@ class DrawStatus(str, Enum):
 
 class Winner(BaseModel):
     user_id: str
-    name: str
+    name: str = Field(default="Unknown")
     prize_amount: float
+    ticket_id: str
+    match_count: int
+    selected_numbers: List[int]
 
 class DrawCreate(BaseModel):
     draw_type: DrawType
@@ -96,7 +99,7 @@ class DrawResponse(BaseModel):
     winning_numbers: List[int] = []
     first_place_winner: Optional[Winner] = None
     consolation_winners: List[Winner] = []
-    platform_earnings: float
+    platform_earnings: float = 0.0
     created_at: datetime
 
 class DrawUpdate(BaseModel):

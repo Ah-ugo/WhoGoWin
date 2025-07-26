@@ -52,7 +52,7 @@ async def buy_ticket(
         "draw_id": ticket_data.draw_id,
         "draw_type": draw["draw_type"],
         "ticket_price": ticket_data.ticket_price,
-        "selected_numbers": ticket_data.selected_numbers,  # Store selected numbers
+        "selected_numbers": ticket_data.selected_numbers,  
         "purchase_date": datetime.utcnow(),
         "status": "active",
         "is_winner": False,

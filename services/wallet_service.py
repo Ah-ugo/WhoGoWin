@@ -3,13 +3,21 @@ import pytz
 from bson import ObjectId
 from database import users_collection, transactions_collection
 from services.notification_service import NotificationService
+from typing import List, Dict, Optional
+from pymongo.client_session import ClientSession
 
 class WalletService:
     def __init__(self):
         self.notification_service = NotificationService()
 
-    async def credit_wallet(self, user_id: str, amount: float, description: str):
-        """Credit amount to user's wallet"""
+    async def credit_wallet(
+        self,
+        user_id: str,
+        amount: float,
+        description: str,
+        session: Optional[ClientSession] = None
+    ):
+        """Credit amount to user's wallet with session support"""
         if amount <= 0:
             raise ValueError("Amount must be positive")
 
@@ -17,7 +25,8 @@ class WalletService:
         user = await users_collection.find_one_and_update(
             {"_id": ObjectId(user_id)},
             {"$inc": {"wallet_balance": amount}},
-            return_document=True
+            return_document=True,
+            session=session
         )
         if not user:
             raise ValueError("User not found")
@@ -30,7 +39,7 @@ class WalletService:
             "status": "completed",
             "date": datetime.now(pytz.UTC)
         }
-        await transactions_collection.insert_one(transaction_doc)
+        await transactions_collection.insert_one(transaction_doc, session=session)
 
         # Notify user
         if user.get("push_token"):
@@ -46,13 +55,22 @@ class WalletService:
             notification_type="wallet_credit"
         )
 
-    async def debit_wallet(self, user_id: str, amount: float, description: str):
-        """Debit amount from user's wallet"""
+    async def debit_wallet(
+        self,
+        user_id: str,
+        amount: float,
+        description: str,
+        session: Optional[ClientSession] = None
+    ):
+        """Debit amount from user's wallet with session support"""
         if amount <= 0:
             raise ValueError("Amount must be positive")
 
         # Atomically check balance and debit
-        user = await users_collection.find_one({"_id": ObjectId(user_id)})
+        user = await users_collection.find_one(
+            {"_id": ObjectId(user_id)},
+            session=session
+        )
         if not user:
             raise ValueError("User not found")
         if user.get("wallet_balance", 0.0) < amount:
@@ -61,7 +79,8 @@ class WalletService:
         updated_user = await users_collection.find_one_and_update(
             {"_id": ObjectId(user_id), "wallet_balance": {"$gte": amount}},
             {"$inc": {"wallet_balance": -amount}},
-            return_document=True
+            return_document=True,
+            session=session
         )
         if not updated_user:
             raise ValueError("Insufficient wallet balance or user not found")
@@ -74,7 +93,7 @@ class WalletService:
             "status": "completed",
             "date": datetime.now(pytz.UTC)
         }
-        await transactions_collection.insert_one(transaction_doc)
+        await transactions_collection.insert_one(transaction_doc, session=session)
 
         # Notify user
         if user.get("push_token"):
@@ -90,9 +109,16 @@ class WalletService:
             notification_type="wallet_debit"
         )
 
-    async def get_balance(self, user_id: str) -> float:
-        """Get user's current wallet balance"""
-        user = await users_collection.find_one({"_id": ObjectId(user_id)})
+    async def get_balance(
+            self,
+            user_id: str,
+            session: Optional[ClientSession] = None
+    ) -> float:
+        """Get user's current wallet balance with session support"""
+        user = await users_collection.find_one(
+            {"_id": ObjectId(user_id)},
+            session=session
+        )
         return user.get("wallet_balance", 0.0) if user else 0.0
 
     async def approve_withdrawal(self, transaction_id: str, admin_id: str):

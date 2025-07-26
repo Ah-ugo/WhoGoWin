@@ -23,12 +23,14 @@ class TicketResponse(BaseModel):
     draw_id: str
     draw_type: str
     ticket_price: float
-    selected_numbers: List[int] = []
-    match_count: Optional[int] = None
+    selected_numbers: List[int]
     purchase_date: datetime
     status: str
     is_winner: bool = False
     prize_amount: Optional[float] = None
+    match_count: Optional[int] = None
+    user_name: Optional[str] = None
+
 
 class TicketUpdate(BaseModel):
     status: Optional[str] = None
