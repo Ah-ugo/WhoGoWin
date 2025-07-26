@@ -9,6 +9,7 @@ from database import tickets_collection, draws_collection, users_collection, tra
 from services.wallet_service import WalletService
 from services.notification_service import NotificationService
 
+
 router = APIRouter()
 wallet_service = WalletService()
 notification_service = NotificationService()
@@ -164,35 +165,65 @@ async def get_all_tickets(
 
 @router.get("/draw/{draw_id}", response_model=List[TicketResponse])
 async def get_tickets_by_draw(
-        draw_id: str,
-        current_user: dict = Depends(get_current_admin_user)
+    draw_id: str,
+    current_user: dict = Depends(get_current_user)
 ):
-    """Get all tickets for a specific draw (Admin only)"""
+    """Get all tickets for a specific draw"""
     try:
+        # Validate draw ID format
+        if not ObjectId.is_valid(draw_id):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid draw ID format"
+            )
+
+        # Check if draw exists
         draw = await draws_collection.find_one({"_id": ObjectId(draw_id)})
         if not draw:
-            raise HTTPException(status_code=404, detail="Draw not found")
+            raise HTTPException(
+                status_code=404,
+                detail="Draw not found"
+            )
 
+        # Get tickets for this draw
         tickets = await tickets_collection.find(
             {"draw_id": draw_id}
         ).sort("purchase_date", -1).to_list(1000)
 
+        # Populate user names for the tickets
         result = []
         for ticket in tickets:
-            result.append(TicketResponse(
-                id=str(ticket["_id"]),
-                user_id=ticket["user_id"],
-                draw_id=ticket["draw_id"],
-                draw_type=ticket["draw_type"],
-                ticket_price=ticket["ticket_price"],
-                purchase_date=ticket["purchase_date"],
-                status=ticket["status"],
-                is_winner=ticket.get("is_winner", False),
-                prize_amount=ticket.get("prize_amount")
-            ))
+            user = await users_collection.find_one(
+                {"_id": ObjectId(ticket["user_id"])},
+                {"name": 1}
+            ) if ticket.get("user_id") else None
+
+            ticket_data = {
+                "id": str(ticket["_id"]),
+                "user_id": ticket["user_id"],
+                "draw_id": ticket["draw_id"],
+                "draw_type": ticket["draw_type"],
+                "ticket_price": ticket["ticket_price"],
+                "selected_numbers": ticket.get("selected_numbers", []),
+                "purchase_date": ticket["purchase_date"],
+                "status": ticket["status"],
+                "is_winner": ticket.get("is_winner", False),
+                "prize_amount": ticket.get("prize_amount"),
+                "match_count": ticket.get("match_count"),
+                "user_name": user.get("name") if user else None
+            }
+            result.append(TicketResponse(**ticket_data))
+
         return result
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail="Invalid draw ID")
+        # logger.error(f"Error getting tickets for draw {draw_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error retrieving tickets"
+        )
 
 @router.get("/user/{user_id}", response_model=List[TicketResponse])
 async def get_tickets_by_user(
