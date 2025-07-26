@@ -3,7 +3,7 @@ from typing import List
 from datetime import datetime, timedelta
 from bson import ObjectId
 
-from models.draw import DrawCreate, DrawResponse, DrawUpdate, DrawStatus
+from models.draw import DrawCreate, DrawResponse, DrawUpdate, DrawStatus, Winner
 from models.user import UserResponse, Role
 from models.ticket import TicketResponse
 from routes.auth import get_current_user, get_current_admin_user
@@ -88,58 +88,85 @@ async def get_active_draws():
 async def get_completed_draws():
     """Get completed draws with proper winner data"""
     try:
+        # Get completed draws sorted by end time (newest first)
         draws = await draws_collection.find(
             {"status": "completed"}
         ).sort("end_time", -1).limit(50).to_list(50)
 
         result = []
         for draw in draws:
-            # Ensure all required fields are present
+            # Get ticket count for this draw
+            ticket_count = await tickets_collection.count_documents(
+                {"draw_id": str(draw["_id"])}
+            )
+
+            # Prepare base draw data with defaults
             draw_data = {
                 "id": str(draw["_id"]),
-                "draw_type": draw["draw_type"],
-                "start_time": draw["start_time"],
-                "end_time": draw["end_time"],
-                "total_pot": draw.get("total_pot", 0.0),
-                "total_tickets": await tickets_collection.count_documents({"draw_id": str(draw["_id"])}),
-                "status": draw["status"],
-                "winning_numbers": draw.get("winning_numbers", []),
-                "created_at": draw["created_at"],
-                "platform_earnings": draw.get("platform_earnings", 0.0)
+                "draw_type": draw.get("draw_type", "Unknown"),
+                "start_time": draw.get("start_time", datetime.utcnow()),
+                "end_time": draw.get("end_time", datetime.utcnow()),
+                "total_pot": float(draw.get("total_pot", 0.0)),
+                "total_tickets": ticket_count,
+                "status": draw.get("status", "completed"),
+                "winning_numbers": list(draw.get("winning_numbers", [])),
+                "platform_earnings": float(draw.get("platform_earnings", 0.0)),
+                "created_at": draw.get("created_at", datetime.utcnow()),
+                "consolation_winners": []  # Initialize empty list
             }
 
-            # Process first place winner
+            # Process first place winner if exists
             if draw.get("first_place_winner"):
-                winner = draw["first_place_winner"]
-                user = await users_collection.find_one({"_id": ObjectId(winner["user_id"])})
-                draw_data["first_place_winner"] = Winner(
-                    user_id=winner["user_id"],
-                    name=user.get("name", "Unknown") if user else "Unknown",
-                    prize_amount=winner["prize_amount"],
-                    ticket_id=winner["ticket_id"],
-                    match_count=winner["match_count"],
-                    selected_numbers=winner["selected_numbers"]
-                )
+                winner_data = draw["first_place_winner"]
+                try:
+                    user = await users_collection.find_one(
+                        {"_id": ObjectId(winner_data.get("user_id"))},
+                        {"name": 1}
+                    ) if winner_data.get("user_id") else None
+
+                    draw_data["first_place_winner"] = Winner(
+                        user_id=winner_data.get("user_id", ""),
+                        name=user.get("name", "Unknown") if user else "Unknown",
+                        prize_amount=float(winner_data.get("prize_amount", 0.0)),
+                        ticket_id=str(winner_data.get("ticket_id", "")),
+                        match_count=int(winner_data.get("match_count", 0)),
+                        selected_numbers=list(winner_data.get("selected_numbers", []))
+                    )
+                except Exception as e:
+                    logger.warning(f"Error processing first place winner: {str(e)}")
+                    draw_data["first_place_winner"] = None
 
             # Process consolation winners
-            draw_data["consolation_winners"] = []
             for winner in draw.get("consolation_winners", []):
-                user = await users_collection.find_one({"_id": ObjectId(winner["user_id"])})
-                draw_data["consolation_winners"].append(Winner(
-                    user_id=winner["user_id"],
-                    name=user.get("name", "Unknown") if user else "Unknown",
-                    prize_amount=winner["prize_amount"],
-                    ticket_id=winner["ticket_id"],
-                    match_count=winner["match_count"],
-                    selected_numbers=winner["selected_numbers"]
-                ))
+                try:
+                    user = await users_collection.find_one(
+                        {"_id": ObjectId(winner.get("user_id"))},
+                        {"name": 1}
+                    ) if winner.get("user_id") else None
+
+                    draw_data["consolation_winners"].append(Winner(
+                        user_id=winner.get("user_id", ""),
+                        name=user.get("name", "Unknown") if user else "Unknown",
+                        prize_amount=float(winner.get("prize_amount", 0.0)),
+                        ticket_id=str(winner.get("ticket_id", "")),
+                        match_count=int(winner.get("match_count", 0)),
+                        selected_numbers=list(winner.get("selected_numbers", []))
+                    ))
+                except Exception as e:
+                    logger.warning(f"Error processing consolation winner: {str(e)}")
+                    continue  # Skip this winner but continue processing others
 
             result.append(DrawResponse(**draw_data))
 
         return result
+
     except Exception as e:
-        logger.error(f"Error getting completed draws: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error getting completed draws: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not retrieve completed draws"
+        )
+
 
 @router.get("/{draw_id}", response_model=DrawResponse)
 async def get_draw(draw_id: str):

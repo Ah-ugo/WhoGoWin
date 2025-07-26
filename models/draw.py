@@ -79,9 +79,9 @@ class Winner(BaseModel):
     user_id: str
     name: str = Field(default="Unknown")
     prize_amount: float
-    ticket_id: str
+    ticket_id: Optional[str] = Field(default=None)
     match_count: int
-    selected_numbers: List[int]
+    selected_numbers: List[int] = Field(default_factory=list)
 
 class DrawCreate(BaseModel):
     draw_type: DrawType
