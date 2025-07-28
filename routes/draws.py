@@ -180,6 +180,41 @@ async def get_draw(draw_id: str):
             {"draw_id": draw_id}
         )
 
+        # Process first place winner
+        first_place_winner = None
+        if draw.get("first_place_winner"):
+            winner_data = draw["first_place_winner"]
+            user = await users_collection.find_one(
+                {"_id": ObjectId(winner_data.get("user_id"))},
+                {"name": 1}
+            ) if winner_data.get("user_id") else None
+
+            first_place_winner = Winner(
+                user_id=winner_data.get("user_id", ""),
+                name=user.get("name", "Unknown") if user else "Unknown",
+                prize_amount=float(winner_data.get("prize_amount", 0.0)),
+                ticket_id=str(winner_data.get("ticket_id", "")),
+                match_count=int(winner_data.get("match_count", 0)),
+                selected_numbers=list(winner_data.get("selected_numbers", []))
+            )
+
+        # Process consolation winners
+        consolation_winners = []
+        for winner in draw.get("consolation_winners", []):
+            user = await users_collection.find_one(
+                {"_id": ObjectId(winner.get("user_id"))},
+                {"name": 1}
+            ) if winner.get("user_id") else None
+
+            consolation_winners.append(Winner(
+                user_id=winner.get("user_id", ""),
+                name=user.get("name", "Unknown") if user else "Unknown",
+                prize_amount=float(winner.get("prize_amount", 0.0)),
+                ticket_id=str(winner.get("ticket_id", "")),
+                match_count=int(winner.get("match_count", 0)),
+                selected_numbers=list(winner.get("selected_numbers", []))
+            ))
+
         return DrawResponse(
             id=str(draw["_id"]),
             draw_type=draw["draw_type"],
@@ -189,14 +224,13 @@ async def get_draw(draw_id: str):
             total_tickets=ticket_count,
             status=draw["status"],
             winning_numbers=draw.get("winning_numbers", []),
-            first_place_winner=draw.get("first_place_winner"),
-            consolation_winners=draw.get("consolation_winners", []),
+            first_place_winner=first_place_winner,
+            consolation_winners=consolation_winners,
             platform_earnings=draw.get("platform_earnings", 0.0),
             created_at=draw["created_at"]
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid draw ID")
-
 
 # @router.post("/create", response_model=DrawResponse)
 # async def create_draw(
